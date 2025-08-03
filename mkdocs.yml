@@ -1,0 +1,9 @@
+site_name: ShadowFlower Council
+site_url: https://ShadowFlowerCouncil.SolarKhan.github.io
+nav:
+  - Home: index.md
+  - Divine Law: COVENANT.md
+  - Profiles: COUNCIL_PROFILES.md
+plugins: []
+theme:
+  name: mkdocs

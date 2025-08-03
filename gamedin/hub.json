@@ -1,0 +1,10 @@
+{
+  "repositories": [
+    {
+      "name": "ShadowFlowerCouncil",
+      "url": "https://github.com/SolarKhan/ShadowFlowerCouncil",
+      "pipeline": "Divina L3",
+      "protocol": "V3"
+    }
+  ]
+}
