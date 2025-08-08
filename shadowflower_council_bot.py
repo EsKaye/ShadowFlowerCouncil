@@ -3,7 +3,7 @@ import discord
 import random
 import asyncio
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
@@ -28,7 +28,7 @@ class ShadowFlowerBot(commands.Bot):
             help_command=None,
             activity=discord.Game(name="!help | Divine Wisdom")
         )
-        self.start_time = datetime.utcnow()
+        self.start_time = datetime.now(timezone.utc)
         self.daily_blessings: Dict[str, dict] = {}
         self.user_devotion: Dict[int, dict] = {}
         self.load_data()
@@ -573,44 +573,7 @@ async def reset_daily_blessings():
     bot.daily_blessings.clear()
     print("Daily blessings have been reset.")
 
-@bot.command(name="invoke", help="Invoke a goddess by name")
-async def invoke(ctx, goddess_name: str = None):
-    """Invoke a goddess by name or list available goddesses."""
-    if not goddess_name:
-        # List goddesses in an embed
-        embed = discord.Embed(
-            title="👑 The ShadowFlower Council",
-            description="Use `!invoke [name]` to call upon a goddess.\n\n" +
-                      "\n".join([f"• **{name}** {data['emoji']} - {', '.join(data['domains'])}" 
-                             for name, data in GODDESSES.items()]),
-            color=0x9b59b6
-        )
-        await ctx.send(embed=embed)
-        return
-    
-    # Find the goddess (case insensitive)
-    goddess_name = next((name for name in GODDESSES if name.lower() == goddess_name.lower()), None)
-    
-    if not goddess_name:
-        await ctx.send("That goddess is not yet awakened. Use `!invoke` to see available goddesses.")
-        return
-    
-    goddess = GODDESSES[goddess_name]
-    
-    # Send initial message with typing indicator
-    async with ctx.typing():
-        message = await ctx.send(f"{goddess['emoji']} {goddess['invocation']}")
-        
-        # Add dramatic delay
-        await asyncio.sleep(2)
-        
-        # Create and send the goddess embed
-        embed = create_goddess_embed(goddess_name, goddess)
-        await message.edit(content=f"{goddess['emoji']} {goddess_name} has been invoked!", embed=embed)
-        
-        # Add reactions for interaction
-        await message.add_reaction("🙏")  # Praying hands
-        await message.add_reaction("✨")  # Sparkles
+# The invoke command is now registered using the command decorator in the main code
 
 @bot.command(name="blessing", help="Receive a blessing from a random goddess")
 async def blessing(ctx):
@@ -658,11 +621,11 @@ async def blessing(ctx):
         bot.user_devotion[ctx.author.id] = {
             'blessings_received': 0,
             'favorite_goddess': None,
-            'last_visit': datetime.utcnow().isoformat()
+            'last_visit': datetime.now(timezone.utc).isoformat()
         }
     
     bot.user_devotion[ctx.author.id]['blessings_received'] += 1
-    bot.user_devotion[ctx.author.id]['last_visit'] = datetime.utcnow().isoformat()
+    bot.user_devotion[ctx.author.id]['last_visit'] = datetime.now(timezone.utc).isoformat()
     bot.save_data()
     
     await ctx.send(embed=embed)
