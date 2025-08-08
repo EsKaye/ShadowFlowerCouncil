@@ -1,0 +1,43 @@
+name: Nightly Guardian Sync
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        branch: [guardian-athena, guardian-persephone, guardian-brigid, guardian-hecate, guardian-lilith]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Create working branch
+        run: |
+          git fetch --all
+          git checkout ${{ matrix.branch }} || git checkout -b ${{ matrix.branch }}
+          git merge --ff-only origin/main || true
+      - name: Guardian transform (optional)
+        run: |
+          echo "Running branch-specific transforms for ${{ matrix.branch }}..."
+      - name: Commit changes (if any)
+        run: |
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(${{ matrix.branch }}): nightly sync from main"
+          fi
+      - name: Push branch
+        run: |
+          git push origin ${{ matrix.branch }} || true
+      - name: Create PR to main
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ matrix.branch }}
+          title: "[council-auto] Merge ${{ matrix.branch }} → main"
+          body: "Nightly sync & evolutions."
+          base: main
+          labels: council-auto,sync
+          draft: false

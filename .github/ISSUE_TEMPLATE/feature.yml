@@ -1,0 +1,15 @@
+name: Feature request
+description: Propose a council feature
+title: "feat: "
+labels: ["feature", "council"]
+body:
+  - type: input
+    id: guardian
+    attributes:
+      label: Guardian
+      description: "athena/brigid/hecate/persephone/lilith"
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: "What, why, done when?"
