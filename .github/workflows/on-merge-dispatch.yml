@@ -1,0 +1,28 @@
+name: Council Dispatch on Merge
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify MCP
+        env:
+          MCP_URL: ${{ secrets.MCP_URL }}
+          DISCORD_WEBHOOK_COUNCIL: ${{ secrets.DISCORD_WEBHOOK_COUNCIL }}
+        run: |
+          curl -sS -X POST "$MCP_URL/integrations/discord/post" \
+            -H "content-type: application/json" \
+            -d '{"webhook":"'$DISCORD_WEBHOOK_COUNCIL'","content":"🌸 ShadowFlower Council: updates merged to main."}'
+      - name: Repository Dispatch to dependents (optional)
+        if: env.GH_PAT != ''
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          for repo in "MKWorldWide/Serafina" "MKWorldWide/GameDinVR"; do
+            curl -sS -X POST "https://api.github.com/repos/$repo/dispatches" \
+              -H "Authorization: Bearer $GH_PAT" \
+              -H "Accept: application/vnd.github+json" \
+              -d '{"event_type":"council-update"}'
+          done
