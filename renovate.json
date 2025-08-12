@@ -1,0 +1,11 @@
+{
+  "extends": ["config:recommended"],
+  "schedule": ["before 5am on monday"],
+  "timezone": "UTC",
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    }
+  ]
+}
