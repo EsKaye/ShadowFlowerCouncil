@@ -573,62 +573,24 @@ async def reset_daily_blessings():
     bot.daily_blessings.clear()
     print("Daily blessings have been reset.")
 
-# The invoke command is now registered using the command decorator in the main code
-
-@bot.command(name="blessing", help="Receive a blessing from a random goddess")
-async def blessing(ctx):
-    """Send a daily blessing from a random goddess."""
-    user_id = str(ctx.author.id)
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+# Start the background task when the bot starts
+@bot.event
+async def on_ready():
+    """Called when the bot is ready and connected to Discord."""
+    print(f'Logged in as {bot.user.name} (ID: {bot.user.id})')
+    print('------')
     
-    # Check if user already received a blessing today
-    if user_id in bot.daily_blessings and bot.daily_blessings[user_id].get('date') == today:
-        goddess_name = bot.daily_blessings[user_id]['goddess']
-        blessing_text = bot.daily_blessings[user_id]['blessing']
-        goddess = GODDESSES[goddess_name]
-        
-        embed = discord.Embed(
-            title=f"{goddess['emoji']} Return for Another Blessing Tomorrow",
-            description=f"You've already received your blessing from **{goddess_name}** today.\n\n"
-                      f"**Your Blessing:** *{blessing_text}*",
-            color=goddess['color']
-        )
-        await ctx.send(embed=embed)
-        return
+    # Start background tasks
+    change_status.start()
+    reset_daily_blessings.start()
     
-    # Get a random goddess and blessing
-    goddess_name, goddess = random.choice(list(GODDESSES.items()))
-    blessing_text = random.choice(goddess['blessings'])
-    
-    # Store the blessing for the day
-    bot.daily_blessings[user_id] = {
-        'date': today,
-        'goddess': goddess_name,
-        'blessing': blessing_text
-    }
-    
-    # Create and send the blessing embed
-    embed = discord.Embed(
-        title=f"{goddess['emoji']} A Blessing from {goddess_name}",
-        description=f"*{blessing_text}*\n\n"
-                  f"**Domains:** {', '.join(goddess['domains'])}\n"
-                  f"**Alignment:** {goddess['alignment']}",
-        color=goddess['color']
+    # Set initial status
+    await bot.change_presence(
+        activity=discord.Game(name="!help | Divine Wisdom"),
+        status=discord.Status.online
     )
     
-    # Track user's devotion
-    if ctx.author.id not in bot.user_devotion:
-        bot.user_devotion[ctx.author.id] = {
-            'blessings_received': 0,
-            'favorite_goddess': None,
-            'last_visit': datetime.now(timezone.utc).isoformat()
-        }
-    
-    bot.user_devotion[ctx.author.id]['blessings_received'] += 1
-    bot.user_devotion[ctx.author.id]['last_visit'] = datetime.now(timezone.utc).isoformat()
-    bot.save_data()
-    
-    await ctx.send(embed=embed)
+    print('Bot is ready and running!')
 
 @bot.command(name="divine", help="Ask the goddesses a yes/no question")
 async def divine(ctx, *, question: str = None):
