@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: shadowflower-bot
+    env: node
+    repo: https://github.com/EsKaye/ShadowFlowerCouncil
+    branch: main
+    rootDirectory: shadowflower-bot  # Point to the subdirectory containing package.json
+    buildCommand: |
+      pnpm install --frozen-lockfile
+      pnpm build
+    startCommand: pnpm start
+    autoDeploy: true
+    envVars:
+      - key: PORT_HTTP
+        value: "10000"
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DEV_GUILD_ID
+        sync: false
+      - key: COMMANDS_SCOPE
+        value: guild
+      - key: DB_DRIVER
+        value: native
+      - key: DATABASE_URL
+        value: /data/shadowflower.db
+      - key: NODE_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: ENABLE_MESSAGE_CONTENT
+        value: "true"
+    healthCheckPath: /health
+    plan: starter
+    region: oregon
+    env: node
+    nodeVersion: 20.11.1
+    buildCommandPriority: high
+    buildCaching: smart
+    disk:
+      name: bot-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=512
