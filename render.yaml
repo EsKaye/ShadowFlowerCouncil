@@ -11,6 +11,8 @@ services:
     envVars:
       - key: DISCORD_TOKEN
         sync: false
+      - key: MISTRAL_API_KEY
+        sync: false
       - key: MCP_URL
         sync: false
       - key: CHN_COUNCIL
@@ -46,6 +48,8 @@ services:
       - key: DISCORD_TOKEN
         sync: false
       - key: GUILD_ID
+        sync: false
+      - key: MISTRAL_API_KEY
         sync: false
       - key: MCP_URL
         sync: false

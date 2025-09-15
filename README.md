@@ -48,6 +48,8 @@ Minimum env:
 - `DISCORD_TOKEN` – bot token from the Discord developer portal
 - Optional: see `.env.example` for `MCP_URL`, `CHN_COUNCIL`, `WH_LILYBEAR`, etc.
 
+If you set `MISTRAL_API_KEY`, the bot will use Mistral for natural responses in `!invoke` and `!divine`.
+
 ## Contributing
 1. Fork and branch from the guardian that matches your feature.
 2. Open a pull request to `main` using the template.

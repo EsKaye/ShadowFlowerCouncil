@@ -2,12 +2,14 @@ import os
 import json
 import random
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Dict, Tuple
 
 import discord
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
+import httpx
 
 # Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
@@ -81,6 +83,33 @@ GODDESSES: Dict[str, dict] = {
 }
 
 
+async def mistral_chat(prompt: str, system: str = "You are a poetic but concise goddess voice.") -> str | None:
+    api_key = os.getenv('MISTRAL_API_KEY')
+    if not api_key:
+        return None
+    url = 'https://api.mistral.ai/v1/chat/completions'
+    headers = { 'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json' }
+    payload = {
+        'model': 'mistral-small-latest',
+        'messages': [
+            { 'role': 'system', 'content': system },
+            { 'role': 'user', 'content': prompt },
+        ],
+        'temperature': 0.8,
+        'max_tokens': 300,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.post(url, headers=headers, json=payload)
+            r.raise_for_status()
+            data = r.json()
+            content = data.get('choices', [{}])[0].get('message', {}).get('content')
+            return content
+    except Exception as e:
+        logger.warning('Mistral API error: %s', e)
+        return None
+
+
 @bot.event
 async def on_ready():
     logger.info('🌺 ShadowFlower Council Online as %s', bot.user)
@@ -118,11 +147,16 @@ async def invoke(ctx: commands.Context, goddess_name: str | None = None):
         return
 
     g = GODDESSES[key]
-    embed = discord.Embed(
-        title=f"{g['emoji']} {key} Answers",
-        description=f"*{g['invocation']}*\n\n**{key}**: {g['description']}",
-        color=g['color']
+    # Try Mistral for a voice line
+    ai = await mistral_chat(
+        prompt=(
+            f"Speak as {key} ({g['description']}). "
+            f"Offer a short blessing (2 sentences) to the caller."
+        ),
+        system="You are the invoked goddess. Be warm, benevolent, and brief."
     )
+    desc = ai or f"*{g['invocation']}*\n\n**{key}**: {g['description']}"
+    embed = discord.Embed(title=f"{g['emoji']} {key} Answers", description=desc, color=g['color'])
     await ctx.send(embed=embed)
     logger.info('Invoked %s by %s', key, ctx.author)
 
@@ -147,13 +181,20 @@ async def divine_guidance(ctx: commands.Context, *, question: str | None = None)
     if not question:
         await ctx.send('Please ask a question for the divine guidance.')
         return
-    responses = [
+    name, g = random.choice(list(GODDESSES.items()))
+    ai = await mistral_chat(
+        prompt=(
+            f"Question: {question}\n\n"
+            f"Answer as {name} in one short sentence (yes/no with a gentle reason)."
+        ),
+        system="Offer a kind, succinct divination. One sentence."
+    )
+    answer = ai or random.choice([
         'The signs point to yes.', 'Without a doubt.', 'You may rely on it.',
         'Ask again later.', 'Better not tell you now.', 'Cannot predict now.',
         "Don't count on it.", 'My reply is no.', 'Very doubtful.'
-    ]
-    name, g = random.choice(list(GODDESSES.items()))
-    embed = discord.Embed(title=f"{g['emoji']} {name}'s Guidance", description=f"**Your Question:** {question}\n\n**Answer:** {random.choice(responses)}", color=g['color'])
+    ])
+    embed = discord.Embed(title=f"{g['emoji']} {name}'s Guidance", description=f"**Your Question:** {question}\n\n**Answer:** {answer}", color=g['color'])
     await ctx.send(embed=embed)
 
 
