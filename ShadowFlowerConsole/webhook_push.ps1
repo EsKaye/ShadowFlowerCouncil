@@ -1,53 +1,56 @@
-# Webhook Push Module for ShadowFlower Council
-# Handles sending messages to Discord webhooks
+<#
+.SYNOPSIS
+  Post a message to a Discord webhook.
+
+.PARAMETER WebhookUrl
+  Discord webhook URL. If not provided, falls back to the DISCORD_WEBHOOK_COUNCIL
+  environment variable or the value in council_config.json (if present).
+
+.PARAMETER Message
+  Message content to send. Supports basic Markdown.
+
+.PARAMETER AuthToken
+  Optional token for upstream validation. Currently not enforced.
+#>
 
 param(
-    [Parameter(Mandatory=$true)]
-    [string]$WebhookUrl,
-    
-    [Parameter(Mandatory=$true)]
-    [string]$Message,
-    
-    [string]$Username = "ShadowFlower Council",
-    
-    [string]$AvatarUrl = "https://i.imgur.com/6x5wJ9N.png",
-    
-    [switch]$TTS = $false,
-    
-    [string]$AuthToken = ""
+    [Parameter(Mandatory=$false)] [string]$WebhookUrl,
+    [Parameter(Mandatory=$true)] [string]$Message,
+    [Parameter(Mandatory=$false)] [string]$AuthToken
 )
 
-# Prepare the message payload
-$payload = @{
-    content = $Message
-    username = $Username
-    avatar_url = $AvatarUrl
-    tts = $TTS
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+function Get-DiscordWebhook {
+    param([string]$explicit)
+
+    if ($explicit) { return $explicit }
+    if ($env:DISCORD_WEBHOOK_COUNCIL) { return $env:DISCORD_WEBHOOK_COUNCIL }
+
+    $cfg = Join-Path $PSScriptRoot 'council_config.json'
+    if (Test-Path $cfg) {
+        try {
+            $json = Get-Content -Raw -Path $cfg | ConvertFrom-Json
+            if ($json.DiscordWebhookUrl -and $json.DiscordWebhookUrl -notmatch 'REDACTED|PLACEHOLDER|^$') {
+                return [string]$json.DiscordWebhookUrl
+            }
+        } catch { }
+    }
+    return $null
 }
 
-# Add auth token if provided
-if (-not [string]::IsNullOrEmpty($AuthToken)) {
-    $payload['auth_token'] = $AuthToken
+$url = Get-DiscordWebhook -explicit $WebhookUrl
+if (-not $url) {
+    Write-Output (@{ success = $false; error = 'No Discord webhook configured'; code = 'NO_WEBHOOK' } | ConvertTo-Json -Compress)
+    exit 0
 }
 
 try {
-    # Convert to JSON with proper formatting
-    $jsonBody = $payload | ConvertTo-Json -Compress -Depth 10 -EscapeHandling Default
-    
-    # Send the webhook
-    $response = Invoke-RestMethod -Uri $WebhookUrl -Method Post -Body $jsonBody -ContentType 'application/json' -ErrorAction Stop
-    
-    # Log success
-    return @{
-        success = $true
-        message = "Message sent successfully"
-        response = $response
-    }
+    $payload = @{ content = $Message }
+    $resp = Invoke-RestMethod -Method Post -Uri $url -ContentType 'application/json' -Body ($payload | ConvertTo-Json -Compress)
+    Write-Output (@{ success = $true } | ConvertTo-Json -Compress)
 } catch {
-    # Log error
-    return @{
-        success = $false
-        error = $_.Exception.Message
-        response = $_.ErrorDetails.Message
-    }
+    Write-Output (@{ success = $false; error = $_.Exception.Message } | ConvertTo-Json -Compress)
 }
+

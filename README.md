@@ -35,6 +35,19 @@ npm run dev
 
 Define environment variables in `.env` or the hosting platform (see [serafina/README.md](serafina/README.md)).
 
+### Running the Council Bot (Python)
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # fill DISCORD_TOKEN and channel IDs as needed
+python shadowflower_council_bot.py
+```
+
+Minimum env:
+- `DISCORD_TOKEN` – bot token from the Discord developer portal
+- Optional: see `.env.example` for `MCP_URL`, `CHN_COUNCIL`, `WH_LILYBEAR`, etc.
+
 ## Contributing
 1. Fork and branch from the guardian that matches your feature.
 2. Open a pull request to `main` using the template.

@@ -1,74 +1,59 @@
-# Module Utilities for ShadowFlower Council
-# Handles module discovery and response generation
+<#
+.SYNOPSIS
+  Utilities for ShadowFlower Console dispatcher.
 
-# Find the path to a module by name
+.DESCRIPTION
+  Provides helpers to locate module paths and produce a simple response
+  from a module folder by sampling its local content.
+#>
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
 function Find-ModulePath {
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)]
         [string]$ModuleName
     )
-    
-    # Handle special case for Lilith.Eve
-    if ($ModuleName -eq "Lilith") {
-        $ModuleName = "Lilith.Eve"
+
+    # Normalize names: allow e.g. "Lilith" or "Lilith.Eve" or "Aphrodite" -> directory match
+    $root = $PSScriptRoot
+    $targetNames = @($ModuleName, ($ModuleName -replace '\.exe$', ''), ("$ModuleName" -replace '\.exe$', ''))
+
+    foreach ($dir in Get-ChildItem -Path $root -Directory) {
+        foreach ($cand in $targetNames) {
+            if ($dir.Name -ieq $cand) {
+                return $dir.FullName
+            }
+        }
     }
-    
-    # First try exact match
-    $modulePath = Join-Path $PSScriptRoot $ModuleName
-    if (Test-Path $modulePath) {
-        return $modulePath
-    }
-    
-    # Try case-insensitive match
-    $module = Get-ChildItem -Path $PSScriptRoot -Directory | 
-              Where-Object { $_.Name -like "*$ModuleName*" } | 
-              Select-Object -First 1
-    
-    if ($null -ne $module) {
-        return $module.FullName
-    }
-    
     return $null
 }
 
-# Get a response from a module
 function Get-ModuleResponse {
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)]
         [string]$ModulePath
     )
-    
-    $moduleName = (Get-Item $ModulePath).Name
-    $memoriesFile = Join-Path $ModulePath "@memories.md"
-    $lessonsFile = Join-Path $ModulePath "@lessons-learned.md"
-    
-    # Try to get a random line from memories or lessons
-    $sourceFile = $null
-    
-    # Prefer lessons-learned if available
-    if (Test-Path $lessonsFile) {
-        $sourceFile = $lessonsFile
-    } elseif (Test-Path $memoriesFile) {
-        $sourceFile = $memoriesFile
+
+    # Prefer an invocation summary from @memories.md, else README.md, else a default line
+    $mem = Join-Path $ModulePath '@memories.md'
+    $readme = Join-Path $ModulePath 'README.md'
+
+    if (Test-Path $mem) {
+        $lines = Get-Content -Path $mem -ErrorAction SilentlyContinue | Select-Object -First 3
+        if ($lines) { return ($lines -join " ").Trim() }
     }
-    
-    if ($null -eq $sourceFile) {
-        return "$moduleName is present but has no memories or lessons to share at this time."
+
+    if (Test-Path $readme) {
+        $lines = Get-Content -Path $readme -ErrorAction SilentlyContinue | Select-Object -First 3
+        if ($lines) { return ($lines -join " ").Trim() }
     }
-    
-    # Get a random line that's not empty and not a header
-    $lines = Get-Content $sourceFile | Where-Object { 
-        $_ -notmatch '^#' -and 
-        -not [string]::IsNullOrWhiteSpace($_) -and
-        $_.Trim().Length -gt 20  # Prefer lines with some content
-    }
-    
-    if ($null -eq $lines -or $lines.Count -eq 0) {
-        return "$moduleName is listening but has no words to share right now."
-    }
-    
-    $randomIndex = Get-Random -Minimum 0 -Maximum $lines.Count
-    return $lines[$randomIndex].Trim()
+
+    return "The temple is quiet, but the presence is felt."
 }
 
-# Functions are available in the caller's scope when dot-sourced
+Export-ModuleMember -Function Find-ModulePath, Get-ModuleResponse
+

@@ -1,83 +1,224 @@
 import os
-import discord
-import random
-import asyncio
 import json
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+import random
+import logging
+from datetime import datetime, timezone
+from typing import Dict, Tuple
+
+import discord
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+logger = logging.getLogger('ShadowFlowerCouncil')
+
+# Env
 load_dotenv()
 
-# Initialize bot with intents
+# Intents
 intents = discord.Intents.default()
 intents.message_content = True
-intents.members = True
-intents.presences = True
+
 
 class ShadowFlowerBot(commands.Bot):
-    """Custom bot class for the ShadowFlower Council."""
-    
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             command_prefix=commands.when_mentioned_or('!'),
             intents=intents,
             case_insensitive=True,
             help_command=None,
-            activity=discord.Game(name="!help | Divine Wisdom")
+            activity=discord.Game(name='!help | Divine Wisdom')
         )
         self.start_time = datetime.now(timezone.utc)
         self.daily_blessings: Dict[str, dict] = {}
-        self.user_devotion: Dict[int, dict] = {}
-        self.load_data()
-    
-    def load_data(self):
-        """Load persistent data from files."""
-        try:
-            if os.path.exists('data/user_devotion.json'):
-                with open('data/user_devotion.json', 'r') as f:
-                    self.user_devotion = json.load(f)
-        except Exception as e:
-            print(f"Error loading data: {e}")
-    
-    def save_data(self):
-        """Save persistent data to files."""
-        try:
-            os.makedirs('data', exist_ok=True)
-            with open('data/user_devotion.json', 'w') as f:
-                json.dump(self.user_devotion, f, indent=2)
-        except Exception as e:
-            print(f"Error saving data: {e}")
+
 
 bot = ShadowFlowerBot()
 
-# Goddess database with extended descriptions and blessings
-GODDESSES = {
-    "Lilith": {
-        "description": "First of the divine feminine, she teaches the power of independence and self-knowledge.",
-        "color": 0x9b59b6,  # Purple
-        "emoji": "🌙",
-        "invocation": "By the silver light of the moon, I call upon Lilith, first among equals...",
-        "domains": ["Wisdom", "Independence", "Desire", "Knowledge"],
-        "alignment": "Neutral",
-        "blessings": [
-            "May your independence be your strength and your wisdom guide your path.",
-            "The night reveals truths the day cannot see. Trust your inner knowing.",
-            "In the silence of the moon, find the answers you seek within.",
-            "Your desires are the compass of your soul. Follow them fearlessly.",
-            "The first breath of creation flows through you. Breathe deeply and know your power."
-        ]
+# Core dataset
+GODDESSES: Dict[str, dict] = {
+    'Lilith': {
+        'description': 'First among equals; independence and inner wisdom.',
+        'color': 0x9b59b6,
+        'emoji': '🌙',
+        'invocation': 'By the moonlit hush, Lilith, I call your name... ',
+        'domains': ['Wisdom', 'Independence', 'Desire', 'Knowledge'],
+        'alignment': 'Neutral',
     },
-    "Athena": {
-        "description": "Goddess of wisdom, strategy, and just warfare. She represents the power of intellect and strategic thinking.",
-        "color": 0x3498db,  # Blue
-        "emoji": "🦉",
-        "invocation": "By the light of wisdom and sound judgment, I call upon Athena, strategist of the gods...",
-        "domains": ["Wisdom", "Strategy", "Warfare", "Craft"],
-        "alignment": "Lawful Good",
-        "blessings": [
+    'Athena': {
+        'description': 'Strategy, craft, and judicious action.',
+        'color': 0x3498db,
+        'emoji': '🦉',
+        'invocation': 'With clear sight and sound judgment, Athena, attend...',
+        'domains': ['Wisdom', 'Strategy', 'Craft'],
+        'alignment': 'Lawful Good',
+    },
+    'Persephone': {
+        'description': 'Transformation through cycles of descent and bloom.',
+        'color': 0x8e44ad,
+        'emoji': '🌷',
+        'invocation': 'Between worlds and seasons, Persephone, guide us...',
+        'domains': ['Transformation', 'Renewal'],
+        'alignment': 'Neutral',
+    },
+    'Hecate': {
+        'description': 'Crossroads, keys, and moonlit mysteries.',
+        'color': 0x2ecc71,
+        'emoji': '🌕',
+        'invocation': 'At the threshold of paths, Hecate, bear your keys...',
+        'domains': ['Magic', 'Crossroads'],
+        'alignment': 'Neutral',
+    },
+    'Aphrodite': {
+        'description': 'Love, beauty, and creative desire.',
+        'color': 0xe91e63,
+        'emoji': '💝',
+        'invocation': 'On the tide of the heart, Aphrodite, arise...',
+        'domains': ['Love', 'Beauty', 'Desire'],
+        'alignment': 'Good',
+    },
+}
+
+
+@bot.event
+async def on_ready():
+    logger.info('🌺 ShadowFlower Council Online as %s', bot.user)
+    rotate_status.start()
+    if not update_daily_blessing.is_running():
+        update_daily_blessing.start()
+
+
+@tasks.loop(seconds=30)
+async def rotate_status():
+    statuses = [
+        discord.Activity(type=discord.ActivityType.listening, name='!help'),
+        discord.Activity(type=discord.ActivityType.watching, name=f'over {len(bot.guilds)} circles'),
+        discord.Game(name='with divine energy'),
+    ]
+    for s in statuses:
+        await bot.change_presence(activity=s)
+        await discord.utils.sleep_until(datetime.now(timezone.utc))  # noop sync with loop
+
+
+# Commands
+@bot.command(name='invoke', help='Invoke a goddess by name')
+async def invoke(ctx: commands.Context, goddess_name: str | None = None):
+    if not goddess_name:
+        embed = discord.Embed(title='🌺 ShadowFlower Council', color=0x9b59b6)
+        embed.description = 'Call upon a goddess with `!invoke [name]`\n\nAvailable:'
+        for name, data in GODDESSES.items():
+            embed.add_field(name=f"{data['emoji']} {name}", value=data['description'], inline=False)
+        await ctx.send(embed=embed)
+        return
+
+    key = next((n for n in GODDESSES if n.lower() == goddess_name.lower()), None)
+    if not key:
+        await ctx.send('That presence is not yet awakened. Use `!invoke` to see who listens.')
+        return
+
+    g = GODDESSES[key]
+    embed = discord.Embed(
+        title=f"{g['emoji']} {key} Answers",
+        description=f"*{g['invocation']}*\n\n**{key}**: {g['description']}",
+        color=g['color']
+    )
+    await ctx.send(embed=embed)
+    logger.info('Invoked %s by %s', key, ctx.author)
+
+
+@bot.command(name='blessing', help='Receive a daily blessing')
+async def daily_blessing(ctx: commands.Context):
+    guild_id = str(ctx.guild.id) if ctx.guild else 'global'
+    today = datetime.utcnow().strftime('%Y-%m-%d')
+    blessing = bot.daily_blessings.get(guild_id)
+    if not blessing or blessing.get('date') != today:
+        name, data = random.choice(list(GODDESSES.items()))
+        msg = f"{data['emoji']} {name} blesses you with {random.choice(['clarity','strength','wisdom','courage'])}."
+        blessing = {'goddess': name, 'message': msg, 'date': today}
+        bot.daily_blessings[guild_id] = blessing
+
+    embed = discord.Embed(title=f"🌺 Daily Blessing from {blessing['goddess']}", description=blessing['message'], color=0x9b59b6)
+    await ctx.send(embed=embed)
+
+
+@bot.command(name='divine', help='Ask a yes/no question')
+async def divine_guidance(ctx: commands.Context, *, question: str | None = None):
+    if not question:
+        await ctx.send('Please ask a question for the divine guidance.')
+        return
+    responses = [
+        'The signs point to yes.', 'Without a doubt.', 'You may rely on it.',
+        'Ask again later.', 'Better not tell you now.', 'Cannot predict now.',
+        "Don't count on it.", 'My reply is no.', 'Very doubtful.'
+    ]
+    name, g = random.choice(list(GODDESSES.items()))
+    embed = discord.Embed(title=f"{g['emoji']} {name}'s Guidance", description=f"**Your Question:** {question}\n\n**Answer:** {random.choice(responses)}", color=g['color'])
+    await ctx.send(embed=embed)
+
+
+@bot.command(name='goddesses', help='List all available goddesses and domains')
+async def list_goddesses(ctx: commands.Context):
+    embed = discord.Embed(title='🌺 The Divine Pantheon', description='The sacred circle of the Council', color=0x9b59b6)
+    for name, data in GODDESSES.items():
+        embed.add_field(name=f"{data['emoji']} {name}", value=' • '.join(data['domains']), inline=False)
+    await ctx.send(embed=embed)
+
+
+@bot.command(name='about', help='About the ShadowFlower Council')
+async def about(ctx: commands.Context):
+    uptime = datetime.utcnow() - bot.start_time
+    days = uptime.days
+    hours = (uptime.seconds // 3600)
+    minutes = (uptime.seconds % 3600) // 60
+    embed = discord.Embed(title='🌺 About ShadowFlower Council', color=0x9b59b6)
+    embed.add_field(name='Uptime', value=f'{days}d {hours}h {minutes}m', inline=True)
+    embed.add_field(name='Goddesses', value=str(len(GODDESSES)), inline=True)
+    await ctx.send(embed=embed)
+
+
+@bot.command(name='help', help='Show help information')
+async def help_command(ctx: commands.Context, command: str | None = None):
+    if command:
+        cmd = bot.get_command(command.lower())
+        if not cmd:
+            await ctx.send(f"No command named '{command}'. Use `!help`.")
+            return
+        embed = discord.Embed(title=f'Help: !{cmd.name}', description=cmd.help or 'No description.', color=0x9b59b6)
+        await ctx.send(embed=embed)
+        return
+    embed = discord.Embed(title='🌺 ShadowFlower Council Help', color=0x9b59b6)
+    for cmd in ['invoke', 'blessing', 'divine', 'goddesses', 'about']:
+        c = bot.get_command(cmd)
+        if c:
+            embed.add_field(name=f'!{c.name}', value=c.help or '—', inline=False)
+    await ctx.send(embed=embed)
+
+
+@tasks.loop(hours=24)
+async def update_daily_blessing():
+    bot.daily_blessings.clear()
+    logger.info('Daily blessings reset')
+
+
+@bot.event
+async def on_command_error(ctx: commands.Context, error: Exception):
+    if isinstance(error, commands.CommandNotFound):
+        return
+    await ctx.send('An error occurred. Please try again.')
+    logger.exception('Command error: %s', error)
+
+
+def main() -> None:
+    token = os.getenv('DISCORD_TOKEN')
+    if not token:
+        logger.error('No DISCORD_TOKEN set. Configure .env or environment.')
+        raise SystemExit(1)
+    bot.run(token)
+
+
+if __name__ == '__main__':
+    main()
             "May your mind be sharp and your strategies unerring.",
             "In battle and in life, let wisdom be your shield and courage your sword.",
             "The owl of wisdom watches over you. Trust in your intellect.",
